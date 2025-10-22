@@ -1,8 +1,8 @@
-Munchkin — Background Clipboard → Nebius → Clipboard (macOS)
+Munchkin — Background Clipboard → LLM → Clipboard (macOS)
 
 Overview
 - Menubar-only app (no Dock icon) that watches your clipboard.
-- It accumulates copied text until there’s 5 seconds of no new copies, then sends the combined text to Nebius (OpenAI-compatible API).
+- It accumulates copied text until there’s 5 seconds of no new copies, then sends the combined text to your selected provider (Nebius, OpenAI, Anthropic, or Groq).
 - As soon as a response arrives, it writes the response back to the clipboard so you can paste it immediately.
 
 Key Behaviors
@@ -13,7 +13,7 @@ Key Behaviors
 
 What You Need
 1) Xcode installed (from the Mac App Store).
-2) A Nebius API key (set in Keychain via the app) and a model name (e.g., deepseek-ai/DeepSeek-V3-0324-fast).
+2) API keys for your provider(s) (set in Keychain via the app): Nebius, OpenAI, Anthropic, or Groq.
 
 Project Setup in Xcode (one-time)
 1. Open Xcode → File → New → Project…
@@ -21,7 +21,7 @@ Project Setup in Xcode (one-time)
 3. Product Name: Munchkin; Interface: SwiftUI; Language: Swift. Click Next.
 4. Save the project (anywhere). Quit Xcode temporarily.
 5. In Finder, drag the contents of this repository’s `Munchkin` folder into your Xcode project’s root group:
-   - Add: `MunchkinApp.swift`, `StatusItemController.swift`, `ClipboardMonitor.swift`, `Coordinator.swift`, `NebiusClient.swift`, `KeychainStore.swift`, `Settings.swift`, `Info.plist`.
+   - Add: `MunchkinApp.swift`, `StatusItemController.swift`, `ClipboardMonitor.swift`, `Coordinator.swift`, `LLMClient.swift`, `NebiusClient.swift`, `OpenAIClient.swift`, `AnthropicClient.swift`, `GroqClient.swift`, `KeychainStore.swift`, `Settings.swift`, `Info.plist`.
    - When prompted, ensure “Copy items if needed” is checked, and your app target is selected.
 6. Set LSUIElement so it runs as a menubar app:
    - In Xcode, select your app target → Info tab.
@@ -32,24 +32,55 @@ Project Setup in Xcode (one-time)
 8. Build & Run (Cmd+R). The app shows as an icon in the macOS menu bar (no Dock icon).
 
 First Run
-- Click the Munchkin menu bar icon → Settings → “Set Nebius API Key…”, paste your key.
+- Menubar → Provider → choose Nebius/OpenAI/Anthropic/Groq.
+- Menubar → “Set <Provider> API Key…”, paste your key.
+- Optional: “Refresh Models” then choose a model under “Model”.
 - Ensure “Active” is checked in the menu.
-- Copy some text; after 5 seconds of no new copies, the app sends the combined text to OpenAI and replaces your clipboard with the response.
+- Copy text; after 5 seconds of no new copies, the app sends the combined text and replaces your clipboard with the response.
 
 Menu Items
-- Active: Toggle processing on/off.
-- Send Now: Immediately send the current accumulation without waiting.
-- Model: Choose a model (predefined list). You can fetch your available models via:
-  `curl https://api.studio.nebius.com/v1/models -H "Authorization: Bearer YOUR_NEBIUS_API_KEY"`
-- Set OpenAI API Key…: Store your key in Keychain.
+- State: current state.
+- Provider: Nebius, OpenAI, Anthropic, Groq.
+- Active: toggle processing.
+- Stealth Mode: compact indicator (I/A/⏳/⏸; shows ‘R’ for 5 seconds after a response is copied).
+- Send Now: send immediately.
+- Model: list of models (dynamic per provider).
+- Refresh Models: fetch provider models.
+- System Prompt: preview, toggle “Use System Prompt”, and edit.
+- Set <Provider> API Key…: per-provider key in Keychain.
 - Quit.
 
 Privacy Notes
-- The app only sends plaintext clipboard data you copy while Active.
-- API key is stored in Keychain.
-- Console logs are minimal by default and can be made verbose in code.
+- Sends plaintext clipboard data only when Active.
+- Keys stored per provider in Keychain.
+- Minimal console logs by default.
 
 Troubleshooting
-- If you don’t see the menubar icon, confirm LSUIElement is set to YES and the app built successfully.
-- If requests fail, verify your Nebius API key and network connectivity.
-- If the app seems to re-trigger on its own writes, verify the loop guard is enabled (it is, by default) and avoid external clipboard managers that rewrite content.
+- If the menubar icon doesn’t show, confirm LSUIElement=YES and successful build.
+- If requests fail, verify provider API key and network. With App Sandbox, enable “Outgoing Connections (Client)”.
+- Loop guard is enabled; avoid clipboard tools that rewrite content.
+
+App Icon (Finder/About) and Status Bar Icon
+1) App Icon (bundle icon shown in Finder/About):
+   - In Xcode, ensure you have an Asset Catalog.
+   - Add an “App Icon” set named `AppIcon`.
+   - Provide 1024×1024 source (Xcode can scale) or fill required sizes.
+   - Target → General → App Icons: choose `AppIcon`.
+2) Status Bar Icon (menubar):
+   - Add a monochrome template PDF/PNG to Assets named `StatusIcon` (≈18×18 pt design).
+   - In Asset inspector, set “Render As: Template Image”.
+   - The code auto-loads it (see `StatusItemController.applyStatusIcon()`); the menubar will show the icon plus title/time (or letters in Stealth Mode).
+
+Packaging without Developer Account (No Notarization)
+Option A: ZIP
+- Build Release (Scheme → Edit Scheme → Build Configuration: Release).
+- Find `Munchkin.app` in DerivedData `Build/Products/Release/`.
+- `ditto -c -k --keepParent "Munchkin.app" "Munchkin.zip"` and share.
+Option B: DMG
+- Stage: `mkdir -p dist/Munchkin_DMG && cp -R "Munchkin.app" dist/Munchkin_DMG/ && ln -s /Applications dist/Munchkin_DMG/Applications`
+- Create: `hdiutil create -volname "Munchkin" -srcfolder "dist/Munchkin_DMG" -ov -format UDZO "Munchkin.dmg"`
+
+Install Instructions for Recipients (no notarization)
+- Copy to /Applications.
+- First run: Right‑click → Open → Open (or allow in Settings → Privacy & Security).
+- If quarantined: `xattr -dr com.apple.quarantine "/Applications/Munchkin.app"`.

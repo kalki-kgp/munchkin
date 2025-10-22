@@ -20,6 +20,7 @@ final class StatusItemController: NSObject {
     }
 
     func setup() {
+        applyStatusIcon()
         updateButtonTitle()
         rebuildMenu()
         coordinator.onStateChange = { [weak self] _ in self?.rebuildMenu() }
@@ -232,6 +233,8 @@ final class StatusItemController: NSObject {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             if let button = self.statusItem.button {
+                // Keep the icon applied if present
+                self.applyStatusIcon()
                 if self.settings.stealthMode {
                     // Determine if we should show 'R' window
                     var text: String
@@ -260,6 +263,17 @@ final class StatusItemController: NSObject {
                     button.toolTip = "Munchkin — \(self.stateText())"
                 }
             }
+        }
+    }
+
+    private func applyStatusIcon() {
+        guard let button = statusItem.button else { return }
+        if let img = NSImage(named: "StatusIcon") {
+            img.isTemplate = true // adapts to light/dark
+            button.image = img
+            button.imagePosition = .imageLeft
+        } else {
+            button.image = nil
         }
     }
 }
