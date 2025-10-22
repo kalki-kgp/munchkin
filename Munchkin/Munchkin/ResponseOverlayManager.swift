@@ -14,7 +14,9 @@ final class ResponseOverlayManager {
 
     private var window: NSWindow?
     private var host: NSHostingView<LineOverlayView>?
+    private var scrollCatcherView: NSView?
     private var hideTimer: Timer?
+    private var firstResponderTries = 0
 
     // Show lines at placement. Calls onClose when hidden by user or inactivity.
     func show(lines: [String], settings: SettingsStore, onClose: @escaping () -> Void) {
@@ -24,7 +26,11 @@ final class ResponseOverlayManager {
                                           fontSize: CGFloat(settings.overlayFontSize),
                                           textColor: Self.color(from: settings.overlayTextColor),
                                           scrollThreshold: CGFloat(settings.overlayScrollSensitivity),
-                                          onClose: { [weak self] in self?.hide(); onClose() })
+                                          onClose: { [weak self] in self?.hide(); onClose() },
+                                          onAttach: { [weak self] v in
+                                              // Save for later; we'll set it as first responder after window is ready
+                                              self?.scrollCatcherView = v
+                                          })
             let hosting = NSHostingView(rootView: content)
             hosting.translatesAutoresizingMaskIntoConstraints = false
 
@@ -81,6 +87,10 @@ final class ResponseOverlayManager {
 
             // Auto-hide after inactivity
             self.scheduleAutoHide(seconds: settings.overlayAutoHideSeconds, onClose: onClose)
+
+            // Defer first responder setting until the view is attached to the window
+            self.firstResponderTries = 0
+            self.tryMakeCatcherFirstResponder()
         }
     }
 
@@ -127,6 +137,18 @@ final class ResponseOverlayManager {
             if s.frame.contains(point) { return s }
         }
         return nil
+    }
+
+    private func tryMakeCatcherFirstResponder() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) { [weak self] in
+            guard let self = self else { return }
+            self.firstResponderTries += 1
+            if let sc = self.scrollCatcherView, let win = sc.window {
+                win.makeFirstResponder(sc)
+            } else if self.firstResponderTries < 15 {
+                self.tryMakeCatcherFirstResponder()
+            }
+        }
     }
 }
 

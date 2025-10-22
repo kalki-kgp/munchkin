@@ -75,6 +75,9 @@ final class StatusItemController: NSObject {
         overlayShowItem.target = self
         overlayShowItem.isEnabled = true
         menu.addItem(overlayShowItem)
+        let overlayHideItem = NSMenuItem(title: "Hide Overlay", action: #selector(hideOverlay), keyEquivalent: "")
+        overlayHideItem.target = self
+        menu.addItem(overlayHideItem)
 
         let sendNowItem = NSMenuItem(title: "Send Now", action: #selector(sendNow), keyEquivalent: "")
         sendNowItem.target = self
@@ -365,6 +368,7 @@ final class StatusItemController: NSObject {
 
     @objc private func showOverlay() { coordinator.showOverlay() }
     @objc private func toggleOverlayAuto() { settings.overlayAutoShow.toggle(); rebuildMenu() }
+    @objc private func hideOverlay() { ResponseOverlayManager.shared.hide() }
 
     @objc private func selectOverlayColor(_ sender: NSMenuItem) {
         settings.overlayTextColor = sender.title.lowercased()
