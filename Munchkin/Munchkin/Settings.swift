@@ -1,0 +1,151 @@
+import Foundation
+
+final class SettingsStore {
+    static let shared = SettingsStore()
+
+    // Default models (seed list)
+    static let defaultModels: [String] = [
+        "deepseek-ai/DeepSeek-V3-0324-fast",
+        "meta-llama/Llama-3.1-8B-Instruct",
+        "mistralai/Mixtral-8x7B-Instruct-v0.1"
+    ]
+
+    private let defaults = UserDefaults.standard
+    private let keychain = KeychainStore(service: "dev.munchkin")
+
+    // UserDefaults-backed
+    private let kIsActive = "isActive"
+    private let kModel = "model"
+    private let kQuietSeconds = "quietSeconds"
+    private let kDelimiter = "delimiter"
+    private let kMaxChars = "maxChars"
+    private let kAvailableModels = "availableModels"
+    private let kProvider = "provider"
+    private let kSystemPrompt = "systemPrompt"
+    private let kUseSystemPrompt = "useSystemPrompt"
+    private let kStealthMode = "stealthMode"
+
+    // Keychain-backed
+    private let kAPIKey = "nebius_api_key"
+
+    var isActive: Bool {
+        get { defaults.object(forKey: kIsActive) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: kIsActive) }
+    }
+
+    var model: String {
+        get {
+            defaults.string(forKey: kModel) ?? availableModels.first ?? SettingsStore.defaultModels.first!
+        }
+        set { defaults.set(newValue, forKey: kModel) }
+    }
+
+    var quietSeconds: TimeInterval {
+        get { defaults.object(forKey: kQuietSeconds) as? TimeInterval ?? 5.0 }
+        set { defaults.set(newValue, forKey: kQuietSeconds) }
+    }
+
+    var delimiter: String {
+        get { defaults.string(forKey: kDelimiter) ?? "\n\n" }
+        set { defaults.set(newValue, forKey: kDelimiter) }
+    }
+
+    var maxChars: Int {
+        get { defaults.object(forKey: kMaxChars) as? Int ?? 12000 }
+        set { defaults.set(newValue, forKey: kMaxChars) }
+    }
+
+    // Provider selection
+    var provider: ModelProvider {
+        get { ModelProvider(rawValue: defaults.string(forKey: kProvider) ?? ModelProvider.nebius.rawValue) ?? .nebius }
+        set {
+            defaults.set(newValue.rawValue, forKey: kProvider)
+            // Reset models to defaults for new provider
+            availableModels = SettingsStore.defaultModels(for: newValue)
+        }
+    }
+
+    // Per-provider API key management
+    func apiKey(for provider: ModelProvider) -> String? {
+        switch provider {
+        case .nebius: return keychain.read(key: "nebius_api_key")
+        case .openai: return keychain.read(key: "openai_api_key")
+        case .anthropic: return keychain.read(key: "anthropic_api_key")
+        case .groq: return keychain.read(key: "groq_api_key")
+        }
+    }
+    func setApiKey(_ key: String?, for provider: ModelProvider) {
+        let val = (key ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let k: String
+        switch provider {
+        case .nebius: k = "nebius_api_key"
+        case .openai: k = "openai_api_key"
+        case .anthropic: k = "anthropic_api_key"
+        case .groq: k = "groq_api_key"
+        }
+        if val.isEmpty { keychain.delete(key: k) } else { keychain.save(key: k, value: val) }
+    }
+
+    // Dynamic list of available models loaded from Nebius
+    var availableModels: [String] {
+        get {
+            if let arr = defaults.array(forKey: kAvailableModels) as? [String], !arr.isEmpty {
+                return arr
+            }
+            return SettingsStore.defaultModels(for: provider)
+        }
+        set {
+            defaults.set(newValue, forKey: kAvailableModels)
+            // Ensure current model remains valid
+            if !newValue.contains(model), let first = newValue.first {
+                model = first
+            }
+        }
+    }
+
+    // Optional system prompt sent with every request
+    var systemPrompt: String {
+        get { defaults.string(forKey: kSystemPrompt) ?? "" }
+        set { defaults.set(newValue, forKey: kSystemPrompt) }
+    }
+
+    var useSystemPrompt: Bool {
+        get { defaults.object(forKey: kUseSystemPrompt) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: kUseSystemPrompt) }
+    }
+
+    var stealthMode: Bool {
+        get { defaults.object(forKey: kStealthMode) as? Bool ?? false }
+        set { defaults.set(newValue, forKey: kStealthMode) }
+    }
+
+    // Default models per provider
+    static func defaultModels(for provider: ModelProvider) -> [String] {
+        switch provider {
+        case .nebius:
+            return [
+                "deepseek-ai/DeepSeek-V3-0324-fast",
+                "meta-llama/Llama-3.1-8B-Instruct",
+                "mistralai/Mixtral-8x7B-Instruct-v0.1"
+            ]
+        case .openai:
+            return [
+                "gpt-4o-mini",
+                "gpt-4.1-mini",
+                "o3-mini"
+            ]
+        case .anthropic:
+            return [
+                "claude-3-haiku-20240307",
+                "claude-3-sonnet-20240229",
+                "claude-3-opus-20240229"
+            ]
+        case .groq:
+            return [
+                "llama-3.1-70b-versatile",
+                "mixtral-8x7b-32768",
+                "gemma2-9b-it"
+            ]
+        }
+    }
+}
