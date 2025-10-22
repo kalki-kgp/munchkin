@@ -1,102 +1,192 @@
-Munchkin — Background Clipboard → LLM → Clipboard (macOS)
+# 🪄 Munchkin — Clipboard → LLM → Clipboard (macOS)
 
-Overview
-- Menubar-only app (no Dock icon) that watches your clipboard.
-- It accumulates copied text until there’s 5 seconds of no new copies, then sends the combined text to your selected provider (Nebius, OpenAI, Anthropic, or Groq).
-- As soon as a response arrives, it writes the response back to the clipboard so you can paste it immediately.
+**Munchkin** is a lightweight, menubar-only macOS app that quietly watches your clipboard, groups multiple quick copies into one message, sends them to your favorite LLM provider (Nebius, OpenAI, Anthropic, or Groq), and then writes the response *right back* to your clipboard — so you can paste instantly.
 
-Key Behaviors
-- Accumulation window: 5 seconds of quiet after the last copy event triggers a send.
-- Multiple quick copies are joined with a configurable delimiter (default: blank line).
-- Loop guard prevents self-triggering when the app writes the clipboard.
-- If you copy while a request is in-flight, those new copies will be queued for the next cycle.
+Think of it as a little helper that "munches" your copied text, feeds it to an AI, and hands you a fresh answer — automatically.
 
-What You Need
-1) Xcode installed (from the Mac App Store).
-2) API keys for your provider(s) (set in Keychain via the app): Nebius, OpenAI, Anthropic, or Groq.
+---
 
-Project Setup in Xcode (one-time)
-1. Open Xcode → File → New → Project…
-2. Choose “App” under the macOS tab. Click Next.
-3. Product Name: Munchkin; Interface: SwiftUI; Language: Swift. Click Next.
-4. Save the project (anywhere). Quit Xcode temporarily.
-5. In Finder, drag the contents of this repository’s `Munchkin` folder into your Xcode project’s root group:
-   - Add: `MunchkinApp.swift`, `StatusItemController.swift`, `ClipboardMonitor.swift`, `Coordinator.swift`, `LLMClient.swift`, `NebiusClient.swift`, `OpenAIClient.swift`, `AnthropicClient.swift`, `GroqClient.swift`, `KeychainStore.swift`, `Settings.swift`, `Info.plist`.
-   - When prompted, ensure “Copy items if needed” is checked, and your app target is selected.
-6. Set LSUIElement so it runs as a menubar app:
-   - In Xcode, select your app target → Info tab.
-   - Add a new key to the Info section: `Application is agent (UIElement)` with value `YES`.
-   - Alternatively, merge the provided `Info.plist` content into your target’s Info.plist and ensure LSUIElement is true.
-7. Capabilities (optional, if you enable App Sandbox):
-   - If App Sandbox is enabled, also enable Outgoing Network Connections.
-8. Build & Run (Cmd+R). The app shows as an icon in the macOS menu bar (no Dock icon).
+## ✨ Key Features
 
-First Run
-- Menubar → Provider → choose Nebius/OpenAI/Anthropic/Groq.
-- Menubar → “Set <Provider> API Key…”, paste your key.
-- Optional: “Refresh Models” then choose a model under “Model”.
-- Ensure “Active” is checked in the menu.
-- Copy text; after 5 seconds of no new copies, the app sends the combined text and replaces your clipboard with the response.
+- 🧩 **Smart Clipboard Accumulation**  
+  Copies made within 5 seconds are combined into one message (with a configurable delimiter).
 
-Menu Items
-- State: current state.
-- Provider: Nebius, OpenAI, Anthropic, Groq.
-- Active: toggle processing.
-- Stealth Mode: compact indicator (I/A/⏳/⏸; shows ‘R’ for 5 seconds after a response is copied).
-- Send Now: send immediately.
-- Model: list of models (dynamic per provider).
-- Refresh Models: fetch provider models.
-- System Prompt: preview, toggle “Use System Prompt”, and edit.
-- Set <Provider> API Key…: per-provider key in Keychain.
-- Settings…: opens a glassy settings window with all options.
-- Quit.
+- ⚡ **Hands-Free LLM Querying**  
+  After 5 seconds of quiet, Munchkin sends the accumulated text to your chosen provider.
 
-Privacy Notes
-- Sends plaintext clipboard data only when Active.
-- Keys stored per provider in Keychain.
-- Minimal console logs by default.
+- 📋 **Instant Response to Clipboard**  
+  As soon as the LLM responds, Munchkin replaces your clipboard with the answer — ready to paste.
 
-Troubleshooting
-- If the menubar icon doesn’t show, confirm LSUIElement=YES and successful build.
-- If requests fail, verify provider API key and network. With App Sandbox, enable “Outgoing Connections (Client)”.
-- Loop guard is enabled; avoid clipboard tools that rewrite content.
+- 🧠 **Supports Multiple Providers**  
+  - [Nebius](https://studio.nebius.com)  
+  - [OpenAI](https://platform.openai.com)  
+  - [Anthropic](https://anthropic.com)  
+  - [Groq](https://groq.com)
 
-App Icon (Finder/About) and Status Bar Icon
-1) App Icon (bundle icon shown in Finder/About):
-   - In Xcode, ensure you have an Asset Catalog.
-   - Add an “App Icon” set named `AppIcon`.
-   - Provide 1024×1024 source (Xcode can scale) or fill required sizes.
-   - Target → General → App Icons: choose `AppIcon`.
-2) Status Bar Icon (menubar):
-   - Add a monochrome template PDF/PNG to Assets named `StatusIcon` (≈18×18 pt design).
-   - In Asset inspector, set “Render As: Template Image”.
-   - The code auto-loads it (see `StatusItemController.applyStatusIcon()`); the menubar will show the icon plus title/time (or letters in Stealth Mode).
+- 🔒 **Privacy-Focused**  
+  - Only processes clipboard data while "Active"  
+  - API keys stored securely in the macOS Keychain  
+  - No external logging or analytics
 
-Packaging without Developer Account (No Notarization)
-Option A: ZIP
-- Build Release (Scheme → Edit Scheme → Build Configuration: Release).
-- Find `Munchkin.app` in DerivedData `Build/Products/Release/`.
-- `ditto -c -k --keepParent "Munchkin.app" "Munchkin.zip"` and share.
-Option B: DMG
-- Stage: `mkdir -p dist/Munchkin_DMG && cp -R "Munchkin.app" dist/Munchkin_DMG/ && ln -s /Applications dist/Munchkin_DMG/Applications`
-- Create: `hdiutil create -volname "Munchkin" -srcfolder "dist/Munchkin_DMG" -ov -format UDZO "Munchkin.dmg"`
+- 🧭 **Stealth Mode**  
+  Minimal menubar indicator (I/A/⏳/⏸/R) for power users.
 
-Install Instructions for Recipients (no notarization)
-- Copy to /Applications.
-- First run: Right‑click → Open → Open (or allow in Settings → Privacy & Security).
-- If quarantined: `xattr -dr com.apple.quarantine "/Applications/Munchkin.app"`.
-Launch at Login (helper target required)
-macOS expects a separate Login Item helper embedded in your app bundle:
-1) In Xcode, add a new target: macOS App → name it MunchkinLoginHelper.
-   - Set its Bundle Identifier to: dev.munchkin.loginhelper (match LaunchAtLoginManager.helperBundleIdentifier).
-   - Set “Application is agent (UIElement)” = YES to hide dock icon.
-2) Build Settings for the main app should automatically embed the helper at:
-   Contents/Library/LoginItems/MunchkinLoginHelper.app
-3) Helper code (minimal): on launch, open the main app and then terminate.
-   Example AppDelegate:
-     - Get main app path: Bundle.main.bundleURL.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-       .appendingPathComponent("MacOS").deletingLastPathComponent().deletingLastPathComponent()
-       (or search for the main app bundle in parent).
-     - Use NSWorkspace.shared.openApplication(at:) to launch it, then NSApp.terminate(nil).
-4) In the main app, the “Launch at Login” toggle uses ServiceManagement.SMAppService to register/unregister the helper.
-5) Users can review/approve login items in System Settings → General → Login Items.
+- 🧰 **Configurable System Prompt, Model, and Trigger**
+
+---
+
+## 🛠️ Installation (Developers)
+
+### Prerequisites
+- macOS 13+  
+- [Xcode](https://developer.apple.com/xcode/) (from Mac App Store)  
+- API key(s) for at least one provider
+
+### Setup
+
+```bash
+git clone https://github.com/<your-username>/Munchkin.git
+cd Munchkin
+open Munchkin.xcodeproj
+```
+
+Then:
+
+1. In Xcode → Build & Run (⌘R)
+2. The app icon will appear in your menu bar (no Dock icon).
+3. Choose your provider and set API key(s) via the menu.
+4. Enable "Active" and start copying text!
+
+---
+
+## 🧩 Configuration
+
+| Setting | Description |
+|---------|-------------|
+| Active | Toggles whether clipboard monitoring is on |
+| Provider | Choose Nebius / OpenAI / Anthropic / Groq |
+| Model | Select a model (refreshable per provider) |
+| System Prompt | Optional; edit or disable |
+| Delimiter | Text used between joined clipboard items |
+| Send Now | Manually send immediately |
+| Stealth Mode | Compact indicator (for minimal UI) |
+
+---
+
+## 🧪 Packaging (without Apple Developer Account)
+
+### Option A – ZIP
+
+```bash
+xcodebuild -configuration Release
+cd build/Release
+ditto -c -k --keepParent "Munchkin.app" "Munchkin.zip"
+```
+
+### Option B – DMG
+
+```bash
+mkdir -p dist/Munchkin_DMG && \
+cp -R "Munchkin.app" dist/Munchkin_DMG/ && \
+ln -s /Applications dist/Munchkin_DMG/Applications && \
+hdiutil create -volname "Munchkin" -srcfolder "dist/Munchkin_DMG" -ov -format UDZO "Munchkin.dmg"
+```
+
+If macOS flags it as unverified:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Munchkin.app"
+```
+
+---
+
+## 🖼️ Icon & Branding
+
+App icon designed to match modern macOS (2025) themes.
+
+- Rounded-rect teal background with a white clipboard silhouette and a "bite" mark.
+- 3 small orange dots symbolize text accumulation & processing.
+
+---
+
+## 🤝 Contributing
+
+Pull requests and feature suggestions are warmly welcome!
+
+Before submitting:
+- Follow Swift & SwiftUI best practices.
+- Keep the code modular and sandbox-friendly.
+- Test locally before PR.
+
+---
+
+## 🪪 License
+
+This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
+
+### MIT License
+
+```text
+MIT License
+
+Copyright (c) 2025 Kalki
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+---
+
+## 🙌 Credits
+
+Built with ❤️ by Kalki
+
+Inspired by the simplicity of automation and curiosity of tiny AI helpers — the munchkin spirit.
+
+---
+
+## 📜 About
+
+Munchkin is a small macOS utility that lives quietly in your menubar. It observes your clipboard, gathers snippets, and sends them to your chosen AI model to generate a quick, intelligent response. Think of it as your background assistant for contextual LLM queries — tiny, private, and fast.
+
+---
+
+## 🧾 App Menu "About" Section
+
+Use this concise, user-facing version in your app:
+
+> **Munchkin**  
+> Clipboard → LLM → Clipboard  
+>  
+> A tiny macOS menubar helper that collects your copied text, sends it to your favorite AI model (Nebius, OpenAI, Anthropic, or Groq), and puts the answer back in your clipboard — automatically.  
+>  
+> © 2025 Kalki  
+> Licensed under the MIT License.
+
+---
+
+## 🚀 Quick Start Guide
+
+1. **Install & Launch**: Build in Xcode and run the app
+2. **Set API Key**: Click the menubar icon and configure your preferred LLM provider
+3. **Activate**: Toggle "Active" mode in the menu
+4. **Copy Text**: Copy any text you want to process
+5. **Wait 5 Seconds**: Munchkin automatically sends your text to the LLM
+6. **Paste Result**: The AI response replaces your clipboard — just paste anywhere!
+
+Happy munching! 🧠✨
