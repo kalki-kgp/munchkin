@@ -82,7 +82,12 @@ final class ResponseOverlayManager {
             w.setFrame(frame, display: true)
 
             self.host = hosting
+            if let ow = w as? OverlayWindow {
+                ow.onClose = { [weak self] in self?.hide(); onClose() }
+            }
             w.makeKeyAndOrderFront(nil)
+            // Set a safe first responder to receive key events (ESC)
+            w.makeFirstResponder(w.contentView)
             NSApp.activate(ignoringOtherApps: true)
 
             // Auto-hide after inactivity
@@ -153,10 +158,19 @@ final class ResponseOverlayManager {
 }
 
 final class OverlayWindow: NSWindow {
+    var onClose: (() -> Void)?
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
     override func makeKeyAndOrderFront(_ sender: Any?) {
         super.makeKeyAndOrderFront(sender)
+    }
+    override func keyDown(with event: NSEvent) {
+        // 53 is ESC keycode
+        if event.keyCode == 53 {
+            onClose?()
+        } else {
+            super.keyDown(with: event)
+        }
     }
 }
 
