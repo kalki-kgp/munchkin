@@ -1,6 +1,6 @@
 # 🪄 Munchkin — Clipboard → LLM → Clipboard (macOS)
 
-**Munchkin** is a lightweight, menubar-only macOS app that quietly watches your clipboard, groups multiple quick copies into one message, sends them to your favorite LLM provider (Nebius, OpenAI, Anthropic, or Groq), and then writes the response *right back* to your clipboard — so you can paste instantly.
+**Munchkin** is a lightweight, menubar-only macOS app developed by Kalki that quietly watches your clipboard, groups multiple quick copies into one message, sends them to your favorite LLM provider (Nebius, OpenAI, Anthropic, or Groq), and then writes the response *right back* to your clipboard — so you can paste instantly.
 
 Think of it as a little helper that "munches" your copied text, feeds it to an AI, and hands you a fresh answer — automatically.
 
