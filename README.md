@@ -48,6 +48,7 @@ Menu Items
 - Refresh Models: fetch provider models.
 - System Prompt: preview, toggle “Use System Prompt”, and edit.
 - Set <Provider> API Key…: per-provider key in Keychain.
+- Settings…: opens a glassy settings window with all options.
 - Quit.
 
 Privacy Notes
@@ -84,3 +85,18 @@ Install Instructions for Recipients (no notarization)
 - Copy to /Applications.
 - First run: Right‑click → Open → Open (or allow in Settings → Privacy & Security).
 - If quarantined: `xattr -dr com.apple.quarantine "/Applications/Munchkin.app"`.
+Launch at Login (helper target required)
+macOS expects a separate Login Item helper embedded in your app bundle:
+1) In Xcode, add a new target: macOS App → name it MunchkinLoginHelper.
+   - Set its Bundle Identifier to: dev.munchkin.loginhelper (match LaunchAtLoginManager.helperBundleIdentifier).
+   - Set “Application is agent (UIElement)” = YES to hide dock icon.
+2) Build Settings for the main app should automatically embed the helper at:
+   Contents/Library/LoginItems/MunchkinLoginHelper.app
+3) Helper code (minimal): on launch, open the main app and then terminate.
+   Example AppDelegate:
+     - Get main app path: Bundle.main.bundleURL.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+       .appendingPathComponent("MacOS").deletingLastPathComponent().deletingLastPathComponent()
+       (or search for the main app bundle in parent).
+     - Use NSWorkspace.shared.openApplication(at:) to launch it, then NSApp.terminate(nil).
+4) In the main app, the “Launch at Login” toggle uses ServiceManagement.SMAppService to register/unregister the helper.
+5) Users can review/approve login items in System Settings → General → Login Items.

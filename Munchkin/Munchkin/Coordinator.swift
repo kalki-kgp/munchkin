@@ -81,6 +81,9 @@ final class Coordinator: ClipboardMonitorDelegate {
             return
         }
 
+        // Ignore very short copies if configured
+        if text.trimmingCharacters(in: .whitespacesAndNewlines).count < settings.ignoreShortCopyBelow { return }
+
         // Idle/Accumulating
         if state == .idle { state = .accumulating }
         append(&accumulator, text: text)
@@ -121,7 +124,8 @@ final class Coordinator: ClipboardMonitorDelegate {
 
         let sys = settings.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
         let sysToUse = (settings.useSystemPrompt && !sys.isEmpty) ? sys : nil
-        currentClient().send(prompt: payload, systemPrompt: sysToUse) { [weak self] result in
+        let redacted = redactIfNeeded(payload)
+        currentClient().send(prompt: redacted, systemPrompt: sysToUse) { [weak self] result in
             guard let self = self else { return }
             self.queue.async {
                 switch result {
@@ -147,5 +151,20 @@ final class Coordinator: ClipboardMonitorDelegate {
                 }
             }
         }
+    }
+
+    // Simple local redaction filters
+    private func redactIfNeeded(_ input: String) -> String {
+        var out = input
+        if settings.redactEmails {
+            out = out.replacingOccurrences(of: "[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}", with: "<email>", options: [.regularExpression, .caseInsensitive])
+        }
+        if settings.redactURLs {
+            out = out.replacingOccurrences(of: "https?://[A-Za-z0-9./?=&_%:-]+", with: "<url>", options: [.regularExpression])
+        }
+        if settings.redactNumbers {
+            out = out.replacingOccurrences(of: "\\b\\d{3,}\\b", with: "<num>", options: [.regularExpression])
+        }
+        return out
     }
 }

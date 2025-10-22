@@ -24,6 +24,12 @@ final class SettingsStore {
     private let kSystemPrompt = "systemPrompt"
     private let kUseSystemPrompt = "useSystemPrompt"
     private let kStealthMode = "stealthMode"
+    private let kShowTime = "showTimeInMenubar"
+    private let kShowIcon = "showStatusIcon"
+    private let kIgnoreShortLen = "ignoreShortCopyBelow"
+    private let kRedactEmails = "redactEmails"
+    private let kRedactURLs = "redactURLs"
+    private let kRedactNumbers = "redactNumbers"
 
     // Keychain-backed
     private let kAPIKey = "nebius_api_key"
@@ -117,6 +123,36 @@ final class SettingsStore {
     var stealthMode: Bool {
         get { defaults.object(forKey: kStealthMode) as? Bool ?? false }
         set { defaults.set(newValue, forKey: kStealthMode) }
+    }
+
+    var showTimeInMenubar: Bool {
+        get { defaults.object(forKey: kShowTime) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: kShowTime) }
+    }
+
+    var showStatusIcon: Bool {
+        get { defaults.object(forKey: kShowIcon) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: kShowIcon) }
+    }
+
+    var ignoreShortCopyBelow: Int {
+        get { defaults.object(forKey: kIgnoreShortLen) as? Int ?? 3 }
+        set { defaults.set(newValue, forKey: kIgnoreShortLen) }
+    }
+
+    var redactEmails: Bool {
+        get { defaults.object(forKey: kRedactEmails) as? Bool ?? false }
+        set { defaults.set(newValue, forKey: kRedactEmails) }
+    }
+
+    var redactURLs: Bool {
+        get { defaults.object(forKey: kRedactURLs) as? Bool ?? false }
+        set { defaults.set(newValue, forKey: kRedactURLs) }
+    }
+
+    var redactNumbers: Bool {
+        get { defaults.object(forKey: kRedactNumbers) as? Bool ?? false }
+        set { defaults.set(newValue, forKey: kRedactNumbers) }
     }
 
     // Default models per provider

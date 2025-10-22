@@ -112,6 +112,14 @@ final class StatusItemController: NSObject {
         menu.addItem(quitItem)
 
         statusItem.menu = menu
+
+        // Add a Settings… item at top of the status menu bar (outside of built menu) is not supported.
+        // So we include a Settings… item within the menu:
+        let settingsItem = NSMenuItem.separator()
+        menu.insertItem(settingsItem, at: 1)
+        let openSettings = NSMenuItem(title: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
+        openSettings.target = self
+        menu.insertItem(openSettings, at: 2)
     }
 
     @objc private func toggleActive() {
@@ -220,6 +228,13 @@ final class StatusItemController: NSObject {
         NSApp.terminate(nil)
     }
 
+    @objc private func showSettings() {
+        let controller = SettingsWindowController()
+        controller.showWindow(nil)
+        controller.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     private func stateText() -> String {
         switch coordinator.state {
         case .idle: return "Idle"
@@ -258,8 +273,8 @@ final class StatusItemController: NSObject {
                     case .inFlight: suffix = " ⏳"
                     case .paused: suffix = " ⏸"
                     }
-                    let time = Self.timeFormatter.string(from: Date())
-                    button.title = "🧩" + suffix + "  " + time
+                    let time = self.settings.showTimeInMenubar ? ("  " + Self.timeFormatter.string(from: Date())) : ""
+                    button.title = "🧩" + suffix + time
                     button.toolTip = "Munchkin — \(self.stateText())"
                 }
             }
@@ -268,7 +283,7 @@ final class StatusItemController: NSObject {
 
     private func applyStatusIcon() {
         guard let button = statusItem.button else { return }
-        if let img = NSImage(named: "StatusIcon") {
+        if settings.showStatusIcon, let img = NSImage(named: "StatusIcon") {
             img.isTemplate = true // adapts to light/dark
             button.image = img
             button.imagePosition = .imageLeft
