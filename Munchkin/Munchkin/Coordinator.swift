@@ -18,6 +18,9 @@ final class Coordinator: ClipboardMonitorDelegate {
     // Used for stealth mode indicator: show 'R' for a short time after response
     private(set) var responseReadyUntil: Date?
 
+    // Keep last response lines for manual overlay
+    private var lastResponseLines: [String] = []
+
     init(settings: SettingsStore, clipboard: ClipboardMonitor) {
         self.settings = settings
         self.clipboard = clipboard
@@ -131,6 +134,15 @@ final class Coordinator: ClipboardMonitorDelegate {
                     // Mark response ready window (5 seconds)
                     self.responseReadyUntil = Date().addingTimeInterval(5)
                     self.onStateChange?(self.state)
+
+                    // Prepare overlay lines
+                    self.lastResponseLines = self.makeLines(from: text)
+                    if self.settings.overlayAutoShow {
+                        ResponseOverlayManager.shared.show(lines: self.lastResponseLines, settings: self.settings) {
+                            // On close by inactivity or double click -> go idle if not in-flight
+                            if self.state != .inFlight { self.state = self.settings.isActive ? .idle : .paused }
+                        }
+                    }
                 case .failure:
                     // Keep nextBatch if any; nothing else to do
                     break
@@ -147,5 +159,38 @@ final class Coordinator: ClipboardMonitorDelegate {
                 }
             }
         }
+    }
+
+    // Show last response overlay manually
+    func showOverlay() {
+        guard !lastResponseLines.isEmpty else { return }
+        ResponseOverlayManager.shared.show(lines: lastResponseLines, settings: settings) {
+            if self.state != .inFlight { self.state = self.settings.isActive ? .idle : .paused }
+        }
+    }
+
+    // Split into single-line units, soft-wrapping by approximate character width
+    private func makeLines(from text: String) -> [String] {
+        let rawLines = text.components(separatedBy: .newlines)
+        let avgCharWidth: CGFloat = 7.0 // approx for 14pt; good enough for paging by chars
+        let maxChars = max(10, Int(CGFloat(settings.overlayWidth) / avgCharWidth))
+        var out: [String] = []
+        for raw in rawLines {
+            let words = raw.split(separator: " ", omittingEmptySubsequences: false)
+            var current = ""
+            for w in words {
+                if current.isEmpty {
+                    current = String(w)
+                } else if current.count + 1 + w.count <= maxChars {
+                    current += " " + w
+                } else {
+                    out.append(current)
+                    current = String(w)
+                }
+            }
+            if !current.isEmpty { out.append(current) }
+            if raw.isEmpty { out.append("") }
+        }
+        return out
     }
 }

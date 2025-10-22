@@ -67,6 +67,15 @@ final class StatusItemController: NSObject {
         stealthItem.target = self
         menu.addItem(stealthItem)
 
+        let overlayAutoItem = NSMenuItem(title: settings.overlayAutoShow ? "Auto-show Overlay ✓" : "Auto-show Overlay", action: #selector(toggleOverlayAuto), keyEquivalent: "")
+        overlayAutoItem.target = self
+        menu.addItem(overlayAutoItem)
+
+        let overlayShowItem = NSMenuItem(title: "Show Last Response Overlay", action: #selector(showOverlay), keyEquivalent: "")
+        overlayShowItem.target = self
+        overlayShowItem.isEnabled = true
+        menu.addItem(overlayShowItem)
+
         let sendNowItem = NSMenuItem(title: "Send Now", action: #selector(sendNow), keyEquivalent: "")
         sendNowItem.target = self
         sendNowItem.isEnabled = coordinator.canSendNow
@@ -87,6 +96,83 @@ final class StatusItemController: NSObject {
         refreshItem.target = self
         refreshItem.isEnabled = !isRefreshing
         menu.addItem(refreshItem)
+
+        // Overlay Settings submenu
+        let overlayMenu = NSMenu()
+        // Text Color
+        let colorMenu = NSMenu()
+        for name in ["Black", "White", "Label"] {
+            let item = NSMenuItem(title: name, action: #selector(selectOverlayColor(_:)), keyEquivalent: "")
+            item.target = self
+            item.state = (settings.overlayTextColor.caseInsensitiveCompare(name) == .orderedSame) ? .on : .off
+            colorMenu.addItem(item)
+        }
+        let colorItem = NSMenuItem(title: "Text Color", action: nil, keyEquivalent: "")
+        colorItem.submenu = colorMenu
+        overlayMenu.addItem(colorItem)
+
+        // Scroll Sensitivity
+        let sensMenu = NSMenu()
+        for (title, value) in [("Low", 10.0), ("Medium", 30.0), ("High", 60.0)] {
+            let item = NSMenuItem(title: title, action: #selector(selectOverlaySensitivity(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = value
+            item.state = (abs(settings.overlayScrollSensitivity - value) < 0.01) ? .on : .off
+            sensMenu.addItem(item)
+        }
+        let sensItem = NSMenuItem(title: "Scroll Sensitivity", action: nil, keyEquivalent: "")
+        sensItem.submenu = sensMenu
+        overlayMenu.addItem(sensItem)
+
+        // Width +/-
+        let incWidth = NSMenuItem(title: "Increase Width", action: #selector(increaseOverlayWidth), keyEquivalent: "")
+        incWidth.target = self
+        overlayMenu.addItem(incWidth)
+        let decWidth = NSMenuItem(title: "Decrease Width", action: #selector(decreaseOverlayWidth), keyEquivalent: "")
+        decWidth.target = self
+        overlayMenu.addItem(decWidth)
+
+        // Font Size +/-
+        let incFont = NSMenuItem(title: "Increase Font Size", action: #selector(increaseOverlayFont), keyEquivalent: "")
+        incFont.target = self
+        overlayMenu.addItem(incFont)
+        let decFont = NSMenuItem(title: "Decrease Font Size", action: #selector(decreaseOverlayFont), keyEquivalent: "")
+        decFont.target = self
+        overlayMenu.addItem(decFont)
+
+        // Placement
+        let placeMenu = NSMenu()
+        for p in OverlayPlacement.allCases {
+            let item = NSMenuItem(title: p.rawValue.capitalized, action: #selector(selectOverlayPlacement(_:)), keyEquivalent: "")
+            item.target = self
+            item.state = (p == settings.overlayPlacement) ? .on : .off
+            placeMenu.addItem(item)
+        }
+        let placeItem = NSMenuItem(title: "Placement", action: nil, keyEquivalent: "")
+        placeItem.submenu = placeMenu
+        overlayMenu.addItem(placeItem)
+
+        // Auto Hide
+        let hideMenu = NSMenu()
+        for (title, secs) in [("Off", 0.0), ("1 min", 60.0), ("5 min", 300.0), ("10 min", 600.0)] {
+            let item = NSMenuItem(title: title, action: #selector(selectOverlayAutoHide(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = secs
+            item.state = (abs(settings.overlayAutoHideSeconds - secs) < 0.1) ? .on : .off
+            hideMenu.addItem(item)
+        }
+        let hideItem = NSMenuItem(title: "Auto Hide", action: nil, keyEquivalent: "")
+        hideItem.submenu = hideMenu
+        overlayMenu.addItem(hideItem)
+
+        // Screen share exclusion
+        let exclItem = NSMenuItem(title: settings.overlayExcludeFromScreenShare ? "Exclude from Screen Sharing ✓" : "Exclude from Screen Sharing", action: #selector(toggleOverlayExcludeShare), keyEquivalent: "")
+        exclItem.target = self
+        overlayMenu.addItem(exclItem)
+
+        let overlayRoot = NSMenuItem(title: "Overlay Settings", action: nil, keyEquivalent: "")
+        overlayRoot.submenu = overlayMenu
+        menu.addItem(overlayRoot)
 
         menu.addItem(.separator())
         // System Prompt
@@ -258,8 +344,8 @@ final class StatusItemController: NSObject {
                     case .inFlight: suffix = " ⏳"
                     case .paused: suffix = " ⏸"
                     }
-                    let time = Self.timeFormatter.string(from: Date())
-                    button.title = "🧩" + suffix + "  " + time
+                    let time = self.settings.showTimeInMenubar ? ("  " + Self.timeFormatter.string(from: Date())) : ""
+                    button.title = "🧩" + suffix + time
                     button.toolTip = "Munchkin — \(self.stateText())"
                 }
             }
@@ -268,7 +354,7 @@ final class StatusItemController: NSObject {
 
     private func applyStatusIcon() {
         guard let button = statusItem.button else { return }
-        if let img = NSImage(named: "StatusIcon") {
+        if settings.showStatusIcon, let img = NSImage(named: "StatusIcon") {
             img.isTemplate = true // adapts to light/dark
             button.image = img
             button.imagePosition = .imageLeft
@@ -276,4 +362,35 @@ final class StatusItemController: NSObject {
             button.image = nil
         }
     }
+
+    @objc private func showOverlay() { coordinator.showOverlay() }
+    @objc private func toggleOverlayAuto() { settings.overlayAutoShow.toggle(); rebuildMenu() }
+
+    @objc private func selectOverlayColor(_ sender: NSMenuItem) {
+        settings.overlayTextColor = sender.title.lowercased()
+        rebuildMenu()
+    }
+
+    @objc private func selectOverlaySensitivity(_ sender: NSMenuItem) {
+        if let val = sender.representedObject as? Double { settings.overlayScrollSensitivity = val }
+        rebuildMenu()
+    }
+
+    @objc private func increaseOverlayWidth() { settings.overlayWidth = min(settings.overlayWidth + 40, 1200); rebuildMenu() }
+    @objc private func decreaseOverlayWidth() { settings.overlayWidth = max(settings.overlayWidth - 40, 200); rebuildMenu() }
+    @objc private func increaseOverlayFont() { settings.overlayFontSize = min(settings.overlayFontSize + 1, 36); rebuildMenu() }
+    @objc private func decreaseOverlayFont() { settings.overlayFontSize = max(settings.overlayFontSize - 1, 8); rebuildMenu() }
+
+    @objc private func selectOverlayPlacement(_ sender: NSMenuItem) {
+        guard let p = OverlayPlacement.allCases.first(where: { $0.rawValue.capitalized == sender.title }) else { return }
+        settings.overlayPlacement = p
+        rebuildMenu()
+    }
+
+    @objc private func selectOverlayAutoHide(_ sender: NSMenuItem) {
+        if let secs = sender.representedObject as? Double { settings.overlayAutoHideSeconds = secs }
+        rebuildMenu()
+    }
+
+    @objc private func toggleOverlayExcludeShare() { settings.overlayExcludeFromScreenShare.toggle(); rebuildMenu() }
 }
